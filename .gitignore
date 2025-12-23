@@ -1,0 +1,62 @@
+# Dependencies
+node_modules/
+venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Build outputs
+.next/
+out/
+dist/
+build/
+*.egg-info/
+cdk.out/
+
+# Environment & Secrets (NEVER commit these!)
+.env
+.env.local
+.env.*.local
+*.env
+backend/.env
+frontend/.env.local
+
+# AWS Credentials (NEVER commit!)
+credentials
+*.pem
+*.key
+aws-credentials*
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+
+# Testing
+coverage/
+.coverage
+htmlcov/
+
+# AWS
+.aws-sam/
+samconfig.toml
+
+# Local Data (contains sensitive user info)
+backend/data/*.json
+backend/data/*.db
+backend/app_settings.json
+
+# Package lock (optional, can be committed)
+# package-lock.json
+
+# Kiro IDE
+.kiro/

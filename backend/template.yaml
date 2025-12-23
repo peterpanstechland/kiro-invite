@@ -1,0 +1,186 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Kiro Invite API
+
+Globals:
+  Function:
+    Timeout: 30
+    MemorySize: 256
+    Runtime: python3.11
+    Environment:
+      Variables:
+        USE_DYNAMODB: "true"
+        DYNAMODB_TABLE_PREFIX: kiro_invite
+        FRONTEND_URL: !Sub "https://${FrontendDomain}"
+        CORS_ORIGINS: !Sub '["https://${FrontendDomain}"]'
+        ADMIN_PASSWORD: !Ref AdminPassword
+        COGNITO_USER_POOL_ID: !Ref CognitoUserPool
+        COGNITO_CLIENT_ID: !Ref CognitoUserPoolClient
+        COGNITO_REGION: !Ref AWS::Region
+
+Parameters:
+  FrontendDomain:
+    Type: String
+    Default: "your-app.vercel.app"
+    Description: Frontend domain for CORS
+  AdminPassword:
+    Type: String
+    Default: "change-me-to-secure-password"
+    Description: Admin password for API authentication (fallback)
+    NoEcho: true
+
+Resources:
+  # API Function
+  KiroInviteFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: .
+      Handler: app.main.handler
+      Events:
+        Api:
+          Type: HttpApi
+          Properties:
+            Path: /{proxy+}
+            Method: ANY
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref InvitesTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref UsersTable
+        - Statement:
+            - Effect: Allow
+              Action:
+                - identitystore:*
+              Resource: "*"
+
+  # DynamoDB Tables
+  InvitesTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: kiro_invite_invites
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: token
+          AttributeType: S
+      KeySchema:
+        - AttributeName: token
+          KeyType: HASH
+
+  UsersTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: kiro_invite_users
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: user_id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: user_id
+          KeyType: HASH
+
+  # Scheduled cleanup (EventBridge)
+  CleanupSchedule:
+    Type: AWS::Events::Rule
+    Properties:
+      ScheduleExpression: "cron(50 15 * * ? *)"  # 23:50 UTC+8 = 15:50 UTC
+      Targets:
+        - Id: CleanupTarget
+          Arn: !GetAtt CleanupFunction.Arn
+
+  CleanupFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: .
+      Handler: app.cleanup.handler
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref InvitesTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref UsersTable
+        - Statement:
+            - Effect: Allow
+              Action:
+                - identitystore:*
+              Resource: "*"
+
+  CleanupPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref CleanupFunction
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt CleanupSchedule.Arn
+
+  # Cognito User Pool
+  CognitoUserPool:
+    Type: AWS::Cognito::UserPool
+    Properties:
+      UserPoolName: kiro-invite-users
+      AutoVerifiedAttributes:
+        - email
+      UsernameAttributes:
+        - email
+      Policies:
+        PasswordPolicy:
+          MinimumLength: 8
+          RequireLowercase: true
+          RequireNumbers: true
+          RequireSymbols: false
+          RequireUppercase: true
+      Schema:
+        - Name: email
+          AttributeDataType: String
+          Mutable: true
+          Required: true
+
+  CognitoUserPoolClient:
+    Type: AWS::Cognito::UserPoolClient
+    Properties:
+      ClientName: kiro-invite-web
+      UserPoolId: !Ref CognitoUserPool
+      GenerateSecret: false
+      ExplicitAuthFlows:
+        - ALLOW_USER_PASSWORD_AUTH
+        - ALLOW_REFRESH_TOKEN_AUTH
+        - ALLOW_USER_SRP_AUTH
+      PreventUserExistenceErrors: ENABLED
+      SupportedIdentityProviders:
+        - COGNITO
+        - AwsSSO
+      CallbackURLs:
+        - !Sub "https://${FrontendDomain}"
+        - !Sub "https://${FrontendDomain}/auth/callback"
+        - "http://localhost:3000"
+        - "http://localhost:3000/auth/callback"
+      LogoutURLs:
+        - !Sub "https://${FrontendDomain}"
+        - !Sub "https://${FrontendDomain}/login"
+        - "http://localhost:3000"
+        - "http://localhost:3000/login"
+      AllowedOAuthFlows:
+        - code
+      AllowedOAuthScopes:
+        - email
+        - openid
+        - profile
+      AllowedOAuthFlowsUserPoolClient: true
+
+  CognitoUserPoolDomain:
+    Type: AWS::Cognito::UserPoolDomain
+    Properties:
+      Domain: !Sub "kiro-invite-${AWS::AccountId}"
+      UserPoolId: !Ref CognitoUserPool
+
+Outputs:
+  ApiUrl:
+    Description: API Gateway URL
+    Value: !Sub "https://${ServerlessHttpApi}.execute-api.${AWS::Region}.amazonaws.com"
+  CognitoUserPoolId:
+    Description: Cognito User Pool ID
+    Value: !Ref CognitoUserPool
+  CognitoClientId:
+    Description: Cognito Client ID
+    Value: !Ref CognitoUserPoolClient
+  CognitoDomain:
+    Description: Cognito Domain
+    Value: !Sub "https://kiro-invite-${AWS::AccountId}.auth.${AWS::Region}.amazoncognito.com"

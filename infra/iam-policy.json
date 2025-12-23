@@ -1,0 +1,28 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "IdentityStoreUserManagement",
+      "Effect": "Allow",
+      "Action": [
+        "identitystore:CreateUser",
+        "identitystore:DeleteUser",
+        "identitystore:DescribeUser",
+        "identitystore:ListUsers",
+        "identitystore:UpdateUser"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "IdentityStoreGroupManagement",
+      "Effect": "Allow",
+      "Action": [
+        "identitystore:CreateGroupMembership",
+        "identitystore:DeleteGroupMembership",
+        "identitystore:ListGroupMemberships",
+        "identitystore:ListGroupMembershipsForMember"
+      ],
+      "Resource": "*"
+    }
+  ]
+}
