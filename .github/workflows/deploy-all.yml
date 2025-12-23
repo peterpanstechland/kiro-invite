@@ -1,0 +1,25 @@
+name: Deploy All
+
+on:
+  workflow_dispatch:
+    inputs:
+      deploy_backend:
+        description: 'Deploy Backend'
+        type: boolean
+        default: true
+      deploy_frontend:
+        description: 'Deploy Frontend'
+        type: boolean
+        default: true
+
+jobs:
+  backend:
+    if: ${{ inputs.deploy_backend }}
+    uses: ./.github/workflows/deploy-backend.yml
+    secrets: inherit
+
+  frontend:
+    if: ${{ inputs.deploy_frontend }}
+    needs: [backend]
+    uses: ./.github/workflows/deploy-frontend.yml
+    secrets: inherit

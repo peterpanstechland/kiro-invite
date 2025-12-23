@@ -366,3 +366,58 @@ sam deploy
 cd frontend
 npx vercel --prod
 ```
+
+
+---
+
+## CI/CD 自动部署（GitHub Actions）
+
+### 配置 GitHub Secrets
+
+在 GitHub 仓库的 **Settings** → **Secrets and variables** → **Actions** 中添加以下 secrets：
+
+#### AWS 部署所需
+
+| Secret 名称 | 说明 | 示例 |
+|-------------|------|------|
+| `AWS_ACCESS_KEY_ID` | AWS IAM 用户 Access Key | `AKIA...` |
+| `AWS_SECRET_ACCESS_KEY` | AWS IAM 用户 Secret Key | `wJal...` |
+| `FRONTEND_DOMAIN` | 前端域名 | `kiro-invite.vercel.app` |
+| `ADMIN_PASSWORD` | 管理员密码（备用） | `YourSecurePassword123!` |
+
+#### Vercel 部署所需
+
+| Secret 名称 | 说明 | 获取方式 |
+|-------------|------|----------|
+| `VERCEL_TOKEN` | Vercel API Token | Vercel Dashboard → Settings → Tokens |
+| `NEXT_PUBLIC_API_URL` | Lambda API URL | SAM 部署输出的 ApiUrl |
+
+### 获取 Vercel Token
+
+1. 登录 [Vercel Dashboard](https://vercel.com/account/tokens)
+2. 点击 **Create Token**
+3. 输入名称（如 `github-actions`）
+4. 复制 Token 并保存到 GitHub Secrets
+
+### 工作流说明
+
+| 工作流 | 触发条件 | 说明 |
+|--------|----------|------|
+| `deploy-backend.yml` | 推送到 main 分支且修改了 backend/ | 自动部署 Lambda |
+| `deploy-frontend.yml` | 推送到 main 分支且修改了 frontend/ | 自动部署 Vercel |
+| `deploy-all.yml` | 手动触发 | 可选择部署后端/前端/全部 |
+
+### 手动触发部署
+
+1. 进入 GitHub 仓库 → **Actions**
+2. 选择 **Deploy All**
+3. 点击 **Run workflow**
+4. 选择要部署的组件
+5. 点击 **Run workflow**
+
+### 首次部署注意事项
+
+1. **先手动部署一次后端**，获取 API URL
+2. 将 API URL 添加到 `NEXT_PUBLIC_API_URL` secret
+3. **先在 Vercel 上链接项目**（`npx vercel link`），然后再使用 CI/CD
+4. 确保 IAM 用户有足够的权限（参考 `infra/iam-policy.json`）
