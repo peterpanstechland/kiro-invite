@@ -66,9 +66,11 @@ export default function LoginPage() {
     localStorage.setItem('pending_identity_store_id', identityStoreId)
 
     // 构建 Cognito Hosted UI URL（使用 Cognito 原生登录）
-    const cognitoDomain = authConfig?.cognito?.domain || 
-      `https://kiro-invite-242201290799.auth.us-east-1.amazoncognito.com`
-    const clientId = authConfig?.cognito?.clientId
+    // 注意：domain 必须是完整的 Cognito 域名 URL
+    const cognitoDomain = authConfig?.cognito?.domain?.startsWith('https://') 
+      ? authConfig.cognito.domain 
+      : `https://kiro-invite-242201290799.auth.us-east-1.amazoncognito.com`
+    const clientId = authConfig?.cognito?.clientId || '1qa4itpard3m4e77ie8pu9gk0s'
     const redirectUri = encodeURIComponent(`${window.location.origin}/auth/callback`)
     
     // 使用 Cognito 原生登录（不指定 identity_provider）
