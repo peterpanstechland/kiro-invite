@@ -102,7 +102,7 @@ export default function ClaimPage() {
                     </p>
                   )}
                 </div>
-              </div>
+             
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -174,7 +174,7 @@ export default function ClaimPage() {
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">有效期至</span>
-                  <span>{result.expires_at ? new Date(result.expires_at).toLocaleDateString('zh-CN') : '-'}</span>
+                  <span>{result.expires_at ? new Date(result.expires_at).toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }) : '-'}</span>
                 </div>
               </div>
 
