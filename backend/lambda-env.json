@@ -1,0 +1,16 @@
+{
+  "Variables": {
+    "ADMIN_PASSWORD": "change-me-to-secure-password",
+    "DYNAMODB_TABLE_PREFIX": "kiro_invite",
+    "COGNITO_REGION": "us-east-1",
+    "CORS_ORIGINS": "[\"https://kiro-invite.vercel.app\"]",
+    "COGNITO_CLIENT_ID": "1qa4itpard3m4e77ie8pu9gk0s",
+    "COGNITO_USER_POOL_ID": "us-east-1_TJLzUElHy",
+    "FRONTEND_URL": "https://kiro-invite.vercel.app",
+    "USE_DYNAMODB": "true",
+    "IDENTITY_STORE_ID": "d-9067c1f114",
+    "IDC_GROUP_PRO": "541854d8-c091-7082-b1e5-406a69cbaf24",
+    "IDC_GROUP_PRO_PLUS": "a4b80498-60f1-709b-9b4e-e9884ede62e7",
+    "IDC_GROUP_POWER": "64382448-b011-703c-5dbc-fde2aa0fe84c"
+  }
+}

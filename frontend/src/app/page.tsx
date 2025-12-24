@@ -164,6 +164,28 @@ export default function AdminPage() {
     await loadInvites()
   }
 
+  // 批量删除选中的邀请
+  const batchRevokeInvites = async () => {
+    if (selectedTokens.size === 0) {
+      alert('请先选择要删除的邀请链接')
+      return
+    }
+    if (!confirm(`确定删除选中的 ${selectedTokens.size} 个邀请链接？`)) return
+    
+    // 并行删除所有选中的
+    await Promise.all(
+      Array.from(selectedTokens).map(token =>
+        fetch(`${API_URL}/api/invites/${token}`, {
+          method: 'DELETE',
+          headers: getHeaders()
+        })
+      )
+    )
+    
+    setSelectedTokens(new Set())
+    await loadInvites()
+  }
+
   const deleteUser = async (userId: string) => {
     if (!confirm('确定删除此用户？')) return
     await fetch(`${API_URL}/api/users/${userId}?store_id=${config?.identityStoreId}`, { 
@@ -479,6 +501,15 @@ export default function AdminPage() {
                         </button>
                       </div>
                     </div>
+                    {selectedTokens.size > 0 && (
+                      <button
+                        onClick={batchRevokeInvites}
+                        className="flex items-center gap-1 px-3 py-1.5 text-sm bg-red-50 border border-red-200 text-red-600 rounded-lg hover:bg-red-100"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                        删除选中
+                      </button>
+                    )}
                   </div>
                 </div>
               )}
