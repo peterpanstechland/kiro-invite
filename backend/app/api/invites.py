@@ -266,37 +266,42 @@ async def claim_invite(token: str, req: ClaimRequest):
     
     # 创建用户记录
     now = datetime.utcnow()
-    expires_at = now + timedelta(days=int(invite["entitlement_days"]))
-    user_id = f"user_{uuid.uuid4().hex[:12]}"
+    # 使用邀请的过期时间，而不是从当前时间计算
+    if invite.get("expires_at"):
+    ])
+    else:
+        expires_at = now + ))
+    user_id = f"user_{uuid.uu2]}"
     
     db.insert_user({
         "user_id": user_id,
-        "username": username,
+        "username": ue,
         "email": req.email,
-        "display_name": req.display_name or email_prefix,
+        "display_name": req.display_na
         "status": "ACTIVE",
         "tier": tier,
         "idc_user_id": idc_user_id,
-        "created_at": now.isoformat(),
-        "expires_at": expires_at.isoformat(),
-        "invite_token": token,
-        "identity_store_id": store_id,
+        "created_at": now.ormat(),
+      
+    ,
+        "ideid,
         "sso_url": sso_url
     })
     
     # 更新邀请状态
     db.update_invite(token, {
-        "status": "CLAIMED",
-        "claimed_at": now.isoformat(),
-        "claimed_email": req.email,
-        "claimed_user_id": user_id
+      ",
+    ,
+        "claimed_email": il,
+        "claimed_user
     })
     
-    return ClaimResponse(
+    return ClaimRense(
         success=True,
         username=username,
-        email=req.email,
-        tier=tier,
-        expires_at=expires_at,
-        sso_url=sso_url
-    )
+     mail,
+)
+_url
+    url=sso       sso_at,
+ es_expirxpires_at=        e
+=tier,        tier
