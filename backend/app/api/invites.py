@@ -26,7 +26,6 @@ def verify_admin(
     验证管理员身份
     必须使用 Cognito JWT Token (Authorization: Bearer <token>)
     """
-    # 必须有 Authorization header
     if not authorization or not authorization.startswith("Bearer "):
         raise HTTPException(401, "需要登录认证")
     
@@ -101,9 +100,7 @@ async def create_invites(
     
     now = datetime.now()
     
-    # 如果传了到期日期，直接使用；否则用天数计算
     if req.expires_date:
-        # 解析日期，设置为当天 23:50（删除时间）
         expires_at = datetime.strptime(req.expires_date, "%Y-%m-%d").replace(hour=23, minute=50, second=0)
     else:
         expires_at = now + timedelta(days=req.entitlement_days)
@@ -197,7 +194,6 @@ async def get_invite_info(token: str):
     if invite["status"] == "REVOKED":
         return InviteInfoResponse(valid=False, error="该邀请已被撤销")
     
-    # 检查过期
     if invite.get("expires_at"):
         exp = datetime.fromisoformat(invite["expires_at"])
         if exp < datetime.utcnow():
@@ -223,32 +219,25 @@ async def claim_invite(token: str, req: ClaimRequest):
     if invite["status"] != "PENDING":
         return ClaimResponse(success=False, error="该邀请不可用")
     
-    # 检查过期
     if invite.get("expires_at"):
         exp = datetime.fromisoformat(invite["expires_at"])
         if exp < datetime.utcnow():
             return ClaimResponse(success=False, error="该邀请已过期")
     
-    # 获取租户信息
     store_id = invite.get("identity_store_id") or settings.IDENTITY_STORE_ID
     sso_url = invite.get("sso_url") or f"https://{store_id}.awsapps.com/start"
     
-    # 检查邮箱是否已注册
     if db.get_user_by_email(req.email, store_id):
         return ClaimResponse(success=False, error="该邮箱已注册")
     
-    # 生成用户名
     email_prefix = req.email.split('@')[0]
     username = f"kiro_{email_prefix[:20]}"
     
-    # 检查用户名是否存在
     if db.get_user_by_username(username, store_id):
         username = f"kiro_{email_prefix[:12]}_{uuid.uuid4().hex[:4]}"
     
-    # 创建 IDC 服务
     idc_service = IDCService(identity_store_id=store_id)
     
-    # 在 AWS IDC 创建用户
     idc_user_id = idc_service.create_user(
         username=username,
         email=req.email,
@@ -258,50 +247,46 @@ async def claim_invite(token: str, req: ClaimRequest):
     if not idc_user_id:
         return ClaimResponse(success=False, error="创建 AWS 账号失败，请稍后重试")
     
-    # 添加用户到 IDC Group
     tier = invite["tier"]
     group_id = settings.get_group_id(tier)
     if group_id:
         idc_service.add_user_to_group(idc_user_id, group_id)
     
-    # 创建用户记录
     now = datetime.utcnow()
-    # 使用邀请的过期时间，而不是从当前时间计算
+    # 使用邀请的过期时间
     if invite.get("expires_at"):
-    ])
+        expires_at = datetime.fromisoformat(invite["expires_at"])
     else:
-        expires_at = now + ))
-    user_id = f"user_{uuid.uu2]}"
+        expires_at = now + timedelta(days=int(invite["entitlement_days"]))
+    user_id = f"user_{uuid.uuid4().hex[:12]}"
     
     db.insert_user({
         "user_id": user_id,
-        "username": ue,
+        "username": username,
         "email": req.email,
-        "display_name": req.display_na
+        "display_name": req.display_name or email_prefix,
         "status": "ACTIVE",
         "tier": tier,
         "idc_user_id": idc_user_id,
-        "created_at": now.ormat(),
-      
-    ,
-        "ideid,
+        "created_at": now.isoformat(),
+        "expires_at": expires_at.isoformat(),
+        "invite_token": token,
+        "identity_store_id": store_id,
         "sso_url": sso_url
     })
     
-    # 更新邀请状态
     db.update_invite(token, {
-      ",
-    ,
-        "claimed_email": il,
-        "claimed_user
+        "status": "CLAIMED",
+        "claimed_at": now.isoformat(),
+        "claimed_email": req.email,
+        "claimed_user_id": user_id
     })
     
-    return ClaimRense(
+    return ClaimResponse(
         success=True,
         username=username,
-     mail,
-)
-_url
-    url=sso       sso_at,
- es_expirxpires_at=        e
-=tier,        tier
+        email=req.email,
+        tier=tier,
+        expires_at=expires_at,
+        sso_url=sso_url
+    )
