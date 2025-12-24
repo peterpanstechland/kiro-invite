@@ -11,7 +11,7 @@ export default function ClaimPage() {
   const token = params.token as string
   
   const [state, setState] = useState<State>('loading')
-  const [info, setInfo] = useState<{ tier?: string; entitlement_days?: number; expires_at?: string } | null>(null)
+  const [info, setInfo] = useState<{ tier?: string; entitlement_days?: number; expires_at?: string; created_at?: string } | null>(null)
   const [email, setEmail] = useState('')
   const [name, setName] = useState('')
   const [result, setResult] = useState<any>(null)
@@ -89,8 +89,18 @@ export default function ClaimPage() {
                 <div>
                   <p className="text-sm font-medium text-primary-800">您收到了 Kiro 账号邀请</p>
                   <p className="text-sm text-primary-600">
-                    等级: {info.tier} · 有效期至: {info.expires_at ? new Date(info.expires_at).toLocaleString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }) : `${info.entitlement_days} 天`}
+                    等级: {info.tier}
                   </p>
+                  {info.created_at && (
+                    <p className="text-xs text-primary-500 mt-1">
+                      创建时间: {new Date(info.created_at).toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })}
+                    </p>
+                  )}
+                  {info.expires_at && (
+                    <p className="text-xs text-primary-500">
+                      有效期至: {new Date(info.expires_at).toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })}
+                    </p>
+                  )}
                 </div>
               </div>
 
