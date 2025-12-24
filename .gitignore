@@ -49,6 +49,8 @@ htmlcov/
 # AWS
 .aws-sam/
 samconfig.toml
+lambda-env.json
+backend/lambda-env.json
 
 # Local Data (contains sensitive user info)
 backend/data/*.json
