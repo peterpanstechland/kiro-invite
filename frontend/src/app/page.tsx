@@ -180,7 +180,7 @@ export default function AdminPage() {
 
   // 批量导出邀请链接
   const exportInvites = (format: 'txt' | 'csv' | 'json') => {
-    const pendingInvites = invites.filter(inv => inv.status === 'PENDING')
+    const pendingInvites = invites.filter(inv => inv.status === 'PENDING' && !isExpired(inv.expires_at))
     
     if (pendingInvites.length === 0) {
       alert('没有待认领的邀请链接可导出')
@@ -233,7 +233,7 @@ export default function AdminPage() {
 
   // 复制所有待认领链接
   const copyAllPendingUrls = () => {
-    const pendingInvites = invites.filter(inv => inv.status === 'PENDING')
+    const pendingInvites = invites.filter(inv => inv.status === 'PENDING' && !isExpired(inv.expires_at))
     if (pendingInvites.length === 0) {
       alert('没有待认领的邀请链接')
       return
@@ -253,6 +253,20 @@ export default function AdminPage() {
       hour: '2-digit',
       minute: '2-digit'
     })
+  }
+
+  // 检查邀请是否已过期
+  const isExpired = (expiresAt: string | null) => {
+    if (!expiresAt) return false
+    return new Date(expiresAt) < new Date()
+  }
+
+  // 获取显示状态（考虑过期）
+  const getDisplayStatus = (inv: Invite) => {
+    if (inv.status === 'PENDING' && isExpired(inv.expires_at)) {
+      return 'EXPIRED'
+    }
+    return inv.status
   }
 
   const handleLogout = () => {
@@ -377,10 +391,10 @@ export default function AdminPage() {
             {/* Invites List */}
             <div className="bg-white rounded-lg shadow-sm overflow-hidden">
               {/* 导出工具栏 */}
-              {invites.filter(inv => inv.status === 'PENDING').length > 0 && (
+              {invites.filter(inv => inv.status === 'PENDING' && !isExpired(inv.expires_at)).length > 0 && (
                 <div className="px-4 py-3 bg-gray-50 border-b flex items-center justify-between">
                   <span className="text-sm text-gray-600">
-                    待认领: {invites.filter(inv => inv.status === 'PENDING').length} 个
+                    待认领: {invites.filter(inv => inv.status === 'PENDING' && !isExpired(inv.expires_at)).length} 个
                   </span>
                   <div className="flex items-center gap-2">
                     <button
@@ -447,15 +461,22 @@ export default function AdminPage() {
                         </button>
                       </td>
                       <td className="px-4 py-3">
-                        <span className={`px-2 py-1 rounded text-xs ${
-                          inv.status === 'PENDING' ? 'bg-yellow-100 text-yellow-700' :
-                          inv.status === 'CLAIMED' ? 'bg-green-100 text-green-700' :
-                          'bg-gray-100 text-gray-700'
-                        }`}>
-                          {inv.status === 'PENDING' ? '待认领' :
-                           inv.status === 'CLAIMED' ? '已认领' :
-                           inv.status === 'REVOKED' ? '已撤销' : inv.status}
-                        </span>
+                        {(() => {
+                          const displayStatus = getDisplayStatus(inv)
+                          return (
+                            <span className={`px-2 py-1 rounded text-xs ${
+                              displayStatus === 'PENDING' ? 'bg-yellow-100 text-yellow-700' :
+                              displayStatus === 'CLAIMED' ? 'bg-green-100 text-green-700' :
+                              displayStatus === 'EXPIRED' ? 'bg-red-100 text-red-700' :
+                              'bg-gray-100 text-gray-700'
+                            }`}>
+                              {displayStatus === 'PENDING' ? '待认领' :
+                               displayStatus === 'CLAIMED' ? '已认领' :
+                               displayStatus === 'EXPIRED' ? '已过期' :
+                               displayStatus === 'REVOKED' ? '已撤销' : displayStatus}
+                            </span>
+                          )
+                        })()}
                       </td>
                       <td className="px-4 py-3 text-sm">{inv.tier}</td>
                       <td className="px-4 py-3 text-sm">{inv.claimed_email || '-'}</td>
