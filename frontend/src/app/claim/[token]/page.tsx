@@ -89,7 +89,7 @@ export default function ClaimPage() {
                 <div>
                   <p className="text-sm font-medium text-primary-800">您收到了 Kiro 账号邀请</p>
                   <p className="text-sm text-primary-600">
-                    等级: {info.tier} · 有效期至: {info.expires_at ? new Date(info.expires_at).toLocaleDateString('zh-CN') : `${info.entitlement_days} 天`}
+                    等级: {info.tier} · 有效期至: {info.expires_at ? new Date(info.expires_at).toLocaleString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }) : `${info.entitlement_days} 天`}
                   </p>
                 </div>
               </div>
