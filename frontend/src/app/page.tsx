@@ -40,6 +40,7 @@ export default function AdminPage() {
   const [users, setUsers] = useState<User[]>([])
   const [copiedToken, setCopiedToken] = useState<string | null>(null)
   const [creating, setCreating] = useState(false)
+  const [selectedTokens, setSelectedTokens] = useState<Set<string>>(new Set())
   
   // 创建邀请表单
   const [count, setCount] = useState(5)
@@ -180,10 +181,13 @@ export default function AdminPage() {
 
   // 批量导出邀请链接
   const exportInvites = (format: 'txt' | 'csv' | 'json') => {
-    const pendingInvites = invites.filter(inv => inv.status === 'PENDING' && !isExpired(inv.expires_at))
+    // 如果有选中的，导出选中的；否则导出所有待认领的
+    const toExport = selectedTokens.size > 0
+      ? invites.filter(inv => selectedTokens.has(inv.token))
+      : invites.filter(inv => inv.status === 'PENDING' && !isExpired(inv.expires_at))
     
-    if (pendingInvites.length === 0) {
-      alert('没有待认领的邀请链接可导出')
+    if (toExport.length === 0) {
+      alert('没有可导出的邀请链接')
       return
     }
 
@@ -193,30 +197,31 @@ export default function AdminPage() {
 
     if (format === 'txt') {
       // 纯文本格式 - 每行一个链接
-      content = pendingInvites.map(inv => inv.claim_url).join('\n')
+      content = toExport.map(inv => inv.claim_url).join('\n')
       filename = `invites_${new Date().toISOString().split('T')[0]}.txt`
-      mimeType = 'text/plain'
+      mimeType = 'text/plain;charset=utf-8'
     } else if (format === 'csv') {
-      // CSV 格式
+      // CSV 格式 - 添加 BOM 解决中文乱码
+      const BOM = '\uFEFF'
       const headers = ['链接', '等级', '过期时间']
-      const rows = pendingInvites.map(inv => [
+      const rows = toExport.map(inv => [
         inv.claim_url,
         inv.tier,
         inv.expires_at || ''
       ])
-      content = [headers.join(','), ...rows.map(r => r.join(','))].join('\n')
+      content = BOM + [headers.join(','), ...rows.map(r => r.join(','))].join('\n')
       filename = `invites_${new Date().toISOString().split('T')[0]}.csv`
-      mimeType = 'text/csv'
+      mimeType = 'text/csv;charset=utf-8'
     } else {
       // JSON 格式
-      content = JSON.stringify(pendingInvites.map(inv => ({
+      content = JSON.stringify(toExport.map(inv => ({
         url: inv.claim_url,
         token: inv.token,
         tier: inv.tier,
         expires_at: inv.expires_at
       })), null, 2)
       filename = `invites_${new Date().toISOString().split('T')[0]}.json`
-      mimeType = 'application/json'
+      mimeType = 'application/json;charset=utf-8'
     }
 
     // 创建下载
@@ -229,18 +234,58 @@ export default function AdminPage() {
     a.click()
     document.body.removeChild(a)
     URL.revokeObjectURL(url)
+    
+    // 导出后清除选择
+    if (selectedTokens.size > 0) {
+      setSelectedTokens(new Set())
+    }
   }
 
   // 复制所有待认领链接
   const copyAllPendingUrls = () => {
-    const pendingInvites = invites.filter(inv => inv.status === 'PENDING' && !isExpired(inv.expires_at))
-    if (pendingInvites.length === 0) {
-      alert('没有待认领的邀请链接')
+    // 如果有选中的，复制选中的；否则复制所有待认领的
+    const toCopy = selectedTokens.size > 0
+      ? invites.filter(inv => selectedTokens.has(inv.token))
+      : invites.filter(inv => inv.status === 'PENDING' && !isExpired(inv.expires_at))
+    
+    if (toCopy.length === 0) {
+      alert('没有可复制的邀请链接')
       return
     }
-    const urls = pendingInvites.map(inv => inv.claim_url).join('\n')
+    const urls = toCopy.map(inv => inv.claim_url).join('\n')
     navigator.clipboard.writeText(urls)
-    alert(`已复制 ${pendingInvites.length} 个链接到剪贴板`)
+    alert(`已复制 ${toCopy.length} 个链接到剪贴板`)
+    
+    // 复制后清除选择
+    if (selectedTokens.size > 0) {
+      setSelectedTokens(new Set())
+    }
+  }
+
+  // 切换选择
+  const toggleSelect = (token: string) => {
+    const newSet = new Set(selectedTokens)
+    if (newSet.has(token)) {
+      newSet.delete(token)
+    } else {
+      newSet.add(token)
+    }
+    setSelectedTokens(newSet)
+  }
+
+  // 全选/取消全选待认领的
+  const toggleSelectAll = () => {
+    const pendingTokens = invites
+      .filter(inv => inv.status === 'PENDING' && !isExpired(inv.expires_at))
+      .map(inv => inv.token)
+    
+    if (selectedTokens.size === pendingTokens.length && pendingTokens.length > 0) {
+      // 全部取消
+      setSelectedTokens(new Set())
+    } else {
+      // 全选
+      setSelectedTokens(new Set(pendingTokens))
+    }
   }
 
   const formatDate = (d: string | null) => {
@@ -395,7 +440,10 @@ export default function AdminPage() {
               {invites.filter(inv => inv.status === 'PENDING' && !isExpired(inv.expires_at)).length > 0 && (
                 <div className="px-4 py-3 bg-gray-50 border-b flex items-center justify-between">
                   <span className="text-sm text-gray-600">
-                    待认领: {invites.filter(inv => inv.status === 'PENDING' && !isExpired(inv.expires_at)).length} 个
+                    {selectedTokens.size > 0 
+                      ? `已选择: ${selectedTokens.size} 个`
+                      : `待认领: ${invites.filter(inv => inv.status === 'PENDING' && !isExpired(inv.expires_at)).length} 个`
+                    }
                   </span>
                   <div className="flex items-center gap-2">
                     <button
@@ -403,12 +451,12 @@ export default function AdminPage() {
                       className="flex items-center gap-1 px-3 py-1.5 text-sm bg-white border rounded-lg hover:bg-gray-50"
                     >
                       <Copy className="w-4 h-4" />
-                      复制全部
+                      {selectedTokens.size > 0 ? '复制选中' : '复制全部'}
                     </button>
                     <div className="relative group">
                       <button className="flex items-center gap-1 px-3 py-1.5 text-sm bg-white border rounded-lg hover:bg-gray-50">
                         <Download className="w-4 h-4" />
-                        导出
+                        {selectedTokens.size > 0 ? '导出选中' : '导出'}
                       </button>
                       <div className="absolute right-0 mt-1 w-32 bg-white border rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-10">
                         <button
@@ -437,6 +485,14 @@ export default function AdminPage() {
               <table className="w-full">
                 <thead className="bg-gray-50">
                   <tr>
+                    <th className="px-4 py-3 text-left">
+                      <input
+                        type="checkbox"
+                        checked={selectedTokens.size > 0 && selectedTokens.size === invites.filter(inv => inv.status === 'PENDING' && !isExpired(inv.expires_at)).length}
+                        onChange={toggleSelectAll}
+                        className="w-4 h-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                      />
+                    </th>
                     <th className="px-4 py-3 text-left text-sm font-medium text-gray-600">链接</th>
                     <th className="px-4 py-3 text-left text-sm font-medium text-gray-600">状态</th>
                     <th className="px-4 py-3 text-left text-sm font-medium text-gray-600">等级</th>
@@ -446,54 +502,63 @@ export default function AdminPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y">
-                  {invites.map(inv => (
-                    <tr key={inv.token}>
-                      <td className="px-4 py-3">
-                        <button
-                          onClick={() => copyUrl(inv.claim_url, inv.token)}
-                          className="flex items-center gap-2 text-sm text-primary-600 hover:text-primary-700"
-                        >
-                          {copiedToken === inv.token ? (
-                            <Check className="w-4 h-4 text-green-500" />
-                          ) : (
-                            <Copy className="w-4 h-4" />
+                  {invites.map(inv => {
+                    const displayStatus = getDisplayStatus(inv)
+                    const canSelect = displayStatus === 'PENDING'
+                    return (
+                      <tr key={inv.token} className={selectedTokens.has(inv.token) ? 'bg-primary-50' : ''}>
+                        <td className="px-4 py-3">
+                          {canSelect && (
+                            <input
+                              type="checkbox"
+                              checked={selectedTokens.has(inv.token)}
+                              onChange={() => toggleSelect(inv.token)}
+                              className="w-4 h-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                            />
                           )}
-                          <span className="font-mono">{inv.token.slice(0, 8)}...</span>
-                        </button>
-                      </td>
-                      <td className="px-4 py-3">
-                        {(() => {
-                          const displayStatus = getDisplayStatus(inv)
-                          return (
-                            <span className={`px-2 py-1 rounded text-xs ${
-                              displayStatus === 'PENDING' ? 'bg-yellow-100 text-yellow-700' :
-                              displayStatus === 'CLAIMED' ? 'bg-green-100 text-green-700' :
-                              displayStatus === 'EXPIRED' ? 'bg-red-100 text-red-700' :
-                              'bg-gray-100 text-gray-700'
-                            }`}>
-                              {displayStatus === 'PENDING' ? '待认领' :
-                               displayStatus === 'CLAIMED' ? '已认领' :
-                               displayStatus === 'EXPIRED' ? '已过期' :
-                               displayStatus === 'REVOKED' ? '已撤销' : displayStatus}
-                            </span>
-                          )
-                        })()}
-                      </td>
-                      <td className="px-4 py-3 text-sm">{inv.tier}</td>
-                      <td className="px-4 py-3 text-sm">{inv.claimed_email || '-'}</td>
-                      <td className="px-4 py-3 text-sm">{formatDate(inv.expires_at)}</td>
-                      <td className="px-4 py-3">
-                        {inv.status === 'PENDING' && (
+                        </td>
+                        <td className="px-4 py-3">
                           <button
-                            onClick={() => revokeInvite(inv.token)}
-                            className="text-red-500 hover:text-red-700"
+                            onClick={() => copyUrl(inv.claim_url, inv.token)}
+                            className="flex items-center gap-2 text-sm text-primary-600 hover:text-primary-700"
                           >
-                            <Trash2 className="w-4 h-4" />
+                            {copiedToken === inv.token ? (
+                              <Check className="w-4 h-4 text-green-500" />
+                            ) : (
+                              <Copy className="w-4 h-4" />
+                            )}
+                            <span className="font-mono">{inv.token.slice(0, 8)}...</span>
                           </button>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className={`px-2 py-1 rounded text-xs ${
+                            displayStatus === 'PENDING' ? 'bg-yellow-100 text-yellow-700' :
+                            displayStatus === 'CLAIMED' ? 'bg-green-100 text-green-700' :
+                            displayStatus === 'EXPIRED' ? 'bg-red-100 text-red-700' :
+                            'bg-gray-100 text-gray-700'
+                          }`}>
+                            {displayStatus === 'PENDING' ? '待认领' :
+                             displayStatus === 'CLAIMED' ? '已认领' :
+                             displayStatus === 'EXPIRED' ? '已过期' :
+                             displayStatus === 'REVOKED' ? '已撤销' : displayStatus}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-sm">{inv.tier}</td>
+                        <td className="px-4 py-3 text-sm">{inv.claimed_email || '-'}</td>
+                        <td className="px-4 py-3 text-sm">{formatDate(inv.expires_at)}</td>
+                        <td className="px-4 py-3">
+                          {inv.status === 'PENDING' && (
+                            <button
+                              onClick={() => revokeInvite(inv.token)}
+                              className="text-red-500 hover:text-red-700"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    )
+                  })}
                 </tbody>
               </table>
               {invites.length === 0 && (
