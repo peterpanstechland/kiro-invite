@@ -11,7 +11,7 @@ export default function ClaimPage() {
   const token = params.token as string
   
   const [state, setState] = useState<State>('loading')
-  const [info, setInfo] = useState<{ tier?: string; entitlement_days?: number } | null>(null)
+  const [info, setInfo] = useState<{ tier?: string; entitlement_days?: number; expires_at?: string } | null>(null)
   const [email, setEmail] = useState('')
   const [name, setName] = useState('')
   const [result, setResult] = useState<any>(null)
@@ -89,7 +89,7 @@ export default function ClaimPage() {
                 <div>
                   <p className="text-sm font-medium text-primary-800">您收到了 Kiro 账号邀请</p>
                   <p className="text-sm text-primary-600">
-                    等级: {info.tier} · 有效期: {info.entitlement_days} 天
+                    等级: {info.tier} · 有效期至: {info.expires_at ? new Date(info.expires_at).toLocaleDateString('zh-CN') : `${info.entitlement_days} 天`}
                   </p>
                 </div>
               </div>

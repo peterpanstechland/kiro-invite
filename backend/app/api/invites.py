@@ -83,6 +83,7 @@ class InviteInfoResponse(BaseModel):
     error: Optional[str] = None
     tier: Optional[str] = None
     entitlement_days: Optional[int] = None
+    expires_at: Optional[str] = None
 
 
 # ==================== 管理员 API ====================
@@ -204,7 +205,8 @@ async def get_invite_info(token: str):
     return InviteInfoResponse(
         valid=True,
         tier=invite["tier"],
-        entitlement_days=invite["entitlement_days"]
+        entitlement_days=invite["entitlement_days"],
+        expires_at=invite.get("expires_at")
     )
 
 
