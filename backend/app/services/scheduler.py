@@ -1,9 +1,12 @@
 """定时任务：检查并处理过期账号"""
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 from typing import Literal
 from app.services.db_factory import db
 from app.services.idc import IDCService
 from app.config import settings
+
+# 北京时区
+BEIJING_TZ = timezone(timedelta(hours=8))
 
 
 class AccountScheduler:
@@ -22,7 +25,8 @@ class AccountScheduler:
         检查并处理过期账号
         返回处理结果统计
         """
-        now = datetime.now()
+        # 使用北京时间
+        now = datetime.now(BEIJING_TZ)
         users = db.get_users(status="ACTIVE")
         
         results = {
@@ -30,7 +34,8 @@ class AccountScheduler:
             "expired": 0,
             "processed": 0,
             "failed": 0,
-            "details": []
+            "details": [],
+            "now": now.isoformat()  # 调试用
         }
         
         for user in users:
@@ -41,11 +46,12 @@ class AccountScheduler:
             if not expires_at:
                 continue
             
-            # 解析过期时间
+            # 解析过期时间（数据库存的是北京时间）
             try:
                 expire_time = datetime.fromisoformat(expires_at)
-                # 到期当天 23:50 删除，所以判断时间设为当天 23:50
-                expire_time = expire_time.replace(hour=23, minute=50, second=0)
+                # 如果没有时区信息，添加北京时区
+                if expire_time.tzinfo is None:
+                    expire_time = expire_time.replace(tzinfo=BEIJING_TZ)
             except:
                 continue
             

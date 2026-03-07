@@ -1,7 +1,7 @@
 """邀请令牌 API"""
 from fastapi import APIRouter, HTTPException, Header, Query, Depends
 from typing import Optional, List
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pydantic import BaseModel, Field
 import secrets
 import uuid
@@ -15,6 +15,9 @@ from app.config import settings
 
 
 router = APIRouter()
+
+# 北京时区
+BEIJING_TZ = timezone(timedelta(hours=8))
 
 
 # ==================== 认证 ====================
@@ -98,10 +101,11 @@ async def create_invites(
     store_id = req.identity_store_id or x_identity_store_id or settings.IDENTITY_STORE_ID
     sso_url = req.sso_url or f"https://{store_id}.awsapps.com/start"
     
-    now = datetime.now()
+    # 使用北京时间
+    now = datetime.now(BEIJING_TZ)
     
     if req.expires_date:
-        expires_at = datetime.strptime(req.expires_date, "%Y-%m-%d").replace(hour=23, minute=50, second=0)
+        expires_at = datetime.strptime(req.expires_date, "%Y-%m-%d").replace(hour=23, minute=50, second=0, tzinfo=BEIJING_TZ)
     else:
         expires_at = now + timedelta(days=req.entitlement_days)
         expires_at = expires_at.replace(hour=23, minute=50, second=0)
@@ -116,8 +120,8 @@ async def create_invites(
             "status": "PENDING",
             "tier": req.tier,
             "entitlement_days": req.entitlement_days,
-            "created_at": now.isoformat(),
-            "expires_at": expires_at.isoformat(),
+            "created_at": now.strftime("%Y-%m-%dT%H:%M:%S"),  # 存储不带时区的北京时间
+            "expires_at": expires_at.strftime("%Y-%m-%dT%H:%M:%S"),
             "note": req.note,
             "identity_store_id": store_id,
             "sso_url": sso_url
@@ -128,8 +132,8 @@ async def create_invites(
             status="PENDING",
             tier=req.tier,
             entitlement_days=req.entitlement_days,
-            created_at=now,
-            expires_at=expires_at,
+            created_at=now.replace(tzinfo=None),
+            expires_at=expires_at.replace(tzinfo=None),
             claimed_email=None,
             claim_url=f"{settings.FRONTEND_URL}/claim/{token}",
             note=req.note
@@ -194,9 +198,13 @@ async def get_invite_info(token: str):
     if invite["status"] == "REVOKED":
         return InviteInfoResponse(valid=False, error="该邀请已被撤销")
     
+    # 使用北京时间比较
+    now = datetime.now(BEIJING_TZ)
     if invite.get("expires_at"):
         exp = datetime.fromisoformat(invite["expires_at"])
-        if exp < datetime.utcnow():
+        if exp.tzinfo is None:
+            exp = exp.replace(tzinfo=BEIJING_TZ)
+        if exp < now:
             return InviteInfoResponse(valid=False, error="该邀请已过期")
     
     return InviteInfoResponse(
@@ -219,9 +227,13 @@ async def claim_invite(token: str, req: ClaimRequest):
     if invite["status"] != "PENDING":
         return ClaimResponse(success=False, error="该邀请不可用")
     
+    # 使用北京时间比较
+    now = datetime.now(BEIJING_TZ)
     if invite.get("expires_at"):
         exp = datetime.fromisoformat(invite["expires_at"])
-        if exp < datetime.utcnow():
+        if exp.tzinfo is None:
+            exp = exp.replace(tzinfo=BEIJING_TZ)
+        if exp < now:
             return ClaimResponse(success=False, error="该邀请已过期")
     
     store_id = invite.get("identity_store_id") or settings.IDENTITY_STORE_ID
@@ -252,12 +264,13 @@ async def claim_invite(token: str, req: ClaimRequest):
     if group_id:
         idc_service.add_user_to_group(idc_user_id, group_id)
     
-    now = datetime.utcnow()
     # 使用邀请的过期时间
     if invite.get("expires_at"):
         expires_at = datetime.fromisoformat(invite["expires_at"])
     else:
         expires_at = now + timedelta(days=int(invite["entitlement_days"]))
+        expires_at = expires_at.replace(tzinfo=None)
+    
     user_id = f"user_{uuid.uuid4().hex[:12]}"
     
     db.insert_user({
@@ -268,8 +281,8 @@ async def claim_invite(token: str, req: ClaimRequest):
         "status": "ACTIVE",
         "tier": tier,
         "idc_user_id": idc_user_id,
-        "created_at": now.isoformat(),
-        "expires_at": expires_at.isoformat(),
+        "created_at": now.strftime("%Y-%m-%dT%H:%M:%S"),  # 存储不带时区的北京时间
+        "expires_at": expires_at.strftime("%Y-%m-%dT%H:%M:%S") if hasattr(expires_at, 'strftime') else str(expires_at)[:19],
         "invite_token": token,
         "identity_store_id": store_id,
         "sso_url": sso_url
@@ -277,7 +290,7 @@ async def claim_invite(token: str, req: ClaimRequest):
     
     db.update_invite(token, {
         "status": "CLAIMED",
-        "claimed_at": now.isoformat(),
+        "claimed_at": now.strftime("%Y-%m-%dT%H:%M:%S"),
         "claimed_email": req.email,
         "claimed_user_id": user_id
     })
@@ -287,6 +300,6 @@ async def claim_invite(token: str, req: ClaimRequest):
         username=username,
         email=req.email,
         tier=tier,
-        expires_at=expires_at,
+        expires_at=expires_at.replace(tzinfo=None) if expires_at.tzinfo else expires_at,
         sso_url=sso_url
     )
